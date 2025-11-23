@@ -1,0 +1,10 @@
+version: "3"
+services:
+  ytbot:
+    build: .
+    container_name: ytbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./downloads:/downloads
