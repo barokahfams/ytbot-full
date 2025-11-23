@@ -87,8 +87,11 @@ async def callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.edit_message_text(f"Memproses {('Video' if action=='v' else 'Audio')} -> {opt}...\nSedang mendownload, tunggu ya.")
     loop = asyncio.get_event_loop()
 
-    # Optional cookies
-    cookies_file = None  # Jika ingin pakai cookies, masukkan path disini
+    # ------------------------------
+    # Masukkan path cookies disini
+    # Export cookies dari browser dan simpan sebagai cookies.txt di folder bot
+    cookies_file = "cookies.txt"  # <-- Ganti sesuai nama file cookies kamu
+    # ------------------------------
 
     try:
         result_path = await loop.run_in_executor(
@@ -154,10 +157,12 @@ def download_youtube(url: str, action: str, opt: str, cookies_path: str | None =
             url
         ]
 
-    # Tambahkan cookies jika valid
+    # ------------------------------
+    # Tambahkan cookies jika ada
     if cookies_path:
         cmd.insert(1, "--cookies")
         cmd.insert(2, cookies_path)
+    # ------------------------------
 
     try:
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=900)
