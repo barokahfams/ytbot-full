@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+7#!/usr/bin/env python3
 """
 Telegram YouTube Downloader Bot (Version C)
 - Accept YouTube link
@@ -90,8 +90,9 @@ async def callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ------------------------------
     # Masukkan path cookies disini
     # Export cookies dari browser dan simpan sebagai cookies.txt di folder bot
-    cookies_file = "cookies.txt"  # <-- Ganti sesuai nama file cookies kamu
-    # ------------------------------
+    # Optional cookies
+    cookies_file = "/home/user/ytbot-full/cookies.txt"  # path lengkap ke cookies
+  
 
     try:
         result_path = await loop.run_in_executor(
