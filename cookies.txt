@@ -1,1 +1,2 @@
-cookies_file = None  # untuk video publik tidak perlu cookies
+cookies_file = "/root/ytbot-full/cookies.txt"
+result_path = await loop.run_in_executor(None, lambda: download_youtube(url, action, opt, cookies_file))
