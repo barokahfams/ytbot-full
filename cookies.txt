@@ -1,4 +1,5 @@
-# Netscape HTTP Cookie File
-# https://curl.se/docs/http-cookies.html
-.youtube.com	TRUE	/	FALSE	1699999999	SSID	ABCD1234XYZ
-.youtube.com	TRUE	/	FALSE	1699999999	YSC	abcd1234efgh5678
+cookies_file = "/root/ytbot-full/cookies.txt"
+result_path = await loop.run_in_executor(
+    None,
+    lambda: download_youtube(url, action, opt, cookies_file)
+)
