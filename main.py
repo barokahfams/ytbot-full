@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """
-Telegram YouTube Downloader Bot (Version B)
+Telegram YouTube Downloader Bot (Version B - Fixed)
+Features:
+- Accept YouTube link
+- Show options: Download Video / Download Audio
+- Show quality choices (best, 720p, 480p, audio only)
+- Download using yt-dlp (subprocess)
+- Convert audio to mp3 if requested (ffmpeg must be installed)
+- Send file back to user (with file size check)
+- If file too big, provide info and keep file on VPS
 """
 
 import os
@@ -9,19 +17,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
-import pytz
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters,
-)
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-# Load .env
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 MAX_SEND_MB = int(os.getenv("MAX_SEND_MB", "45"))
@@ -29,7 +27,7 @@ MAX_SEND_MB = int(os.getenv("MAX_SEND_MB", "45"))
 if not TOKEN:
     raise SystemExit("Please set TELEGRAM_TOKEN in .env")
 
-# ---------------- Helpers -----------------
+# ---------------- Helper ----------------
 def sizeof_fmt(num, suffix='B'):
     for unit in ['','K','M','G','T','P']:
         if abs(num) < 1024.0:
@@ -46,7 +44,62 @@ def build_quality_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# ---------------- Handlers -----------------
+# ---------------- Download Function ----------------
+def download_youtube(url: str, action: str, opt: str, cookies_path: str | None = None) -> str | None:
+    tmpdir = tempfile.mkdtemp(prefix="ytbot_")
+    out_template = os.path.join(tmpdir, "%(title).200s.%(ext)s")
+
+    if action == "v":
+        if opt == "best":
+            format_str = "bestvideo+bestaudio/best"
+        elif opt == "720":
+            format_str = "bestvideo[height<=720]+bestaudio/best[height<=720]"
+        elif opt == "480":
+            format_str = "bestvideo[height<=480]+bestaudio/best[height<=480]"
+        else:
+            format_str = "bestvideo+bestaudio/best"
+
+        cmd = [
+            "yt-dlp",
+            "-f", format_str,
+            "-o", out_template,
+            "--merge-output-format", "mp4",
+            "--extractor-args", "youtube:player_client=default",
+            url
+        ]
+    else:  # audio
+        cmd = [
+            "yt-dlp",
+            "-f", "bestaudio",
+            "-x",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "-o", out_template,
+            "--extractor-args", "youtube:player_client=default",
+            url
+        ]
+
+    if cookies_path:
+        cmd.insert(1, "--cookies")
+        cmd.insert(2, cookies_path)
+
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=900)
+        if proc.returncode != 0:
+            raise RuntimeError(f"yt-dlp error: {proc.stderr[:1000]}")
+
+        files = list(Path(tmpdir).glob("*"))
+        if not files:
+            raise RuntimeError("File tidak ditemukan setelah yt-dlp selesai.")
+        return str(sorted(files, key=lambda p: p.stat().st_size, reverse=True)[0])
+
+    except Exception as e:
+        for f in Path(tmpdir).glob("*"):
+            f.unlink()
+        Path(tmpdir).rmdir()
+        raise
+
+# ---------------- Handlers ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Hai — kirim link YouTube, saya bantu download.\n"
@@ -83,10 +136,13 @@ async def callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     action, opt = data.split(":", 1)
     await q.edit_message_text(f"Memproses {('Video' if action=='v' else 'Audio')} -> {opt}...\nSedang mendownload, tunggu ya.")
-
     loop = asyncio.get_event_loop()
+
+    # optional cookies file
+    cookies_file = "/root/ytbot-full/cookies.txt"  # jika ada, bisa None
+
     try:
-        result_path = await loop.run_in_executor(None, lambda: download_youtube(url, action, opt))
+        result_path = await loop.run_in_executor(None, lambda: download_youtube(url, action, opt, cookies_file))
     except Exception as e:
         await update.effective_chat.send_message(f"Error saat download: {e}")
         return
@@ -105,51 +161,16 @@ async def callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(result_path)
         else:
             await update.effective_chat.send_message(
-                f"File terlalu besar untuk dikirim lewat Telegram bot ({size_mb:.1f} MB). "
+                f"File terlalu besar untuk dikirim lewat Telegram bot ({size_mb:.1f} MB).\n"
                 f"Simpan file di VPS: {result_path}\n"
                 "Jika mau, saya bisa bantu host file via HTTP sementara (butuh konfirmasi)."
             )
     except Exception as e:
         await update.effective_chat.send_message(f"Gagal mengirim file: {e}")
 
-# ---------------- Downloader -----------------
-def download_youtube(url: str, action: str, opt: str) -> str | None:
-    tmpdir = tempfile.mkdtemp(prefix="ytbot_")
-    out_template = os.path.join(tmpdir, "%(title).200s.%(ext)s")
-
-    if action == "v":
-        if opt == "best":
-            format_str = "bestvideo+bestaudio/best"
-        elif opt == "720":
-            format_str = "bestvideo[height<=720]+bestaudio/best[height<=720]"
-        elif opt == "480":
-            format_str = "bestvideo[height<=480]+bestaudio/best[height<=480]"
-        else:
-            format_str = "bestvideo+bestaudio/best"
-
-        cmd = ["yt-dlp", "-f", format_str, "-o", out_template, "--merge-output-format", "mp4", url]
-    else:
-        cmd = ["yt-dlp", "-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", "0", "-o", out_template, url]
-
-    try:
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=900)
-        if proc.returncode != 0:
-            raise RuntimeError(f"yt-dlp error: {proc.stderr[:1000]}")
-        files = list(Path(tmpdir).glob("*"))
-        if not files:
-            raise RuntimeError("File tidak ditemukan setelah yt-dlp selesai.")
-        return str(sorted(files, key=lambda p: p.stat().st_size, reverse=True)[0])
-    except Exception as e:
-        for f in Path(tmpdir).glob("*"):
-            f.unlink()
-        Path(tmpdir).rmdir()
-        raise
-
-# ---------------- Main -----------------
+# ---------------- Main ----------------
 def main():
-    # Tidak perlu timezone
     app = Application.builder().token(TOKEN).build()
-
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
