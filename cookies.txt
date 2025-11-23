@@ -1,0 +1,2 @@
+cookies_file = "/root/ytbot-full/cookies.txt"  # sesuaikan
+result_path = await loop.run_in_executor(None, lambda: download_youtube(url, action, opt, cookies_file))
