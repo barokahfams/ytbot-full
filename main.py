@@ -17,6 +17,9 @@ from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
+# Buat folder downloads jika belum ada
+os.makedirs("downloads", exist_ok=True)
+
 # Load .env
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
