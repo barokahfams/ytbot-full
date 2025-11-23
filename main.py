@@ -138,8 +138,10 @@ async def callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.edit_message_text(f"Memproses {('Video' if action=='v' else 'Audio')} -> {opt}...\nSedang mendownload, tunggu ya.")
     loop = asyncio.get_event_loop()
 
-    # optional cookies file
-    cookies_file = "/root/ytbot-full/cookies.txt"  # jika ada, bisa None
+    # ← Simpan kode di sini
+    cookies_file = "/root/ytbot-full/cookies.txt"
+    if not Path(cookies_file).exists() or os.path.getsize(cookies_file) == 0:
+        cookies_file = None  # video publik, tidak pakai cookies
 
     try:
         result_path = await loop.run_in_executor(None, lambda: download_youtube(url, action, opt, cookies_file))
