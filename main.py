@@ -147,9 +147,8 @@ def download_youtube(url: str, action: str, opt: str) -> str | None:
 
 # ---------------- Main -----------------
 def main():
-    # Gunakan pytz timezone agar compatible APScheduler
-    app = Application.builder().token(TOKEN).timezone("Asia/Jakarta").build()
-
+    # Tidak perlu timezone
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
